@@ -1,0 +1,413 @@
+
+
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+
+<meta name="theme-color" content="#101725">
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+
+<title>Morse GPS</title>
+
+<style>
+
+*{box-sizing:border-box}
+
+:root{font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#f4f6fc;background:#0b1019}
+
+body{margin:0;padding:18px 12px;min-height:100dvh}
+
+main{max-width:550px;margin:auto}
+
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:17px}
+
+small{font-size:10px;color:#90aaff;font-weight:800;letter-spacing:1.5px}
+
+h1{font-size:27px;margin:3px 0}
+
+#count{color:#9be7ba;background:#19372c;border-radius:30px;padding:8px 11px;font-size:11px;font-weight:700}
+
+#slots{display:grid;gap:9px}
+
+.slot{display:flex;align-items:center;gap:8px;padding:10px;background:#171e2d;border:1px solid #303b4d;border-radius:14px}
+
+.slot.active{background:#243451;border:2px solid #83a9ff;padding:9px}
+
+.num{color:#9ba9bf;font-size:12px;width:20px}
+
+.code{flex:1;min-width:0;text-align:left;border:0;background:transparent;color:#f4f6fc;font-size:clamp(17px,5vw,26px);font-weight:750;letter-spacing:-.5px;white-space:nowrap;padding:9px 0}
+
+.code.ready{color:#9be7ba}
+
+.map{border:0;background:#a6e8bf;color:#153d27;border-radius:99px;padding:11px 15px;font-weight:800}
+
+.radio{background:transparent;color:#8baaff;border:1px solid #53617a;border-radius:50%;width:30px;height:30px}
+
+.editor{margin-top:16px;padding:14px;background:#171e2d;border:1px solid #303b4d;border-radius:16px}
+
+.edithead{display:flex;justify-content:space-between;color:#a9b8d1;font-size:11px;font-weight:750}
+
+#morse{min-height:68px;background:#0c1421;border:1px solid #303b4d;border-radius:10px;padding:12px;margin:12px 0;font:14px/1.5 monospace;overflow-wrap:anywhere}
+
+.cursor{color:#9be7ba}
+
+.keys{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+
+button{cursor:pointer;touch-action:manipulation}
+
+.key{background:#303e5a;color:white;border:1px solid #465575;border-radius:11px;padding:16px;font-size:18px;font-weight:800}
+
+.dot{background:#3867db}
+
+.tools{display:grid;grid-template-columns:1fr 1fr 1.2fr 1fr;gap:8px;margin-top:9px}
+
+.tool{background:#29364e;color:#fff;border:1px solid #40516e;border-radius:10px;padding:14px 3px;font-size:13px;font-weight:750}
+
+.danger{background:#54313b;color:#ffbaba}
+
+#info{font-size:12px;color:#a9b8d1;margin:14px 0}
+
+.actions{display:flex;gap:9px}
+
+.actions button{flex:1;background:#244a36;border:1px solid #417a58;color:#b8f5cb;border-radius:10px;padding:13px 5px;font-weight:800}
+
+.actions button:disabled{opacity:.35}
+
+#clear{width:100%;margin-top:11px;background:transparent;border:1px solid #70434b;color:#ffaaaa;border-radius:10px;padding:12px;font-weight:750}
+
+#notice{min-height:18px;margin-top:10px;text-align:center;color:#9be7ba;font-size:12px}
+
+footer{text-align:center;color:#7f8ca3;font-size:11px;margin-top:18px}
+
+</style>
+
+</head>
+
+<body>
+
+<main>
+
+<header>
+
+<div><small>DAYZ / NASDARA</small><h1>Morse GPS</h1></div>
+
+<div id="count">0 / 4 READY</div>
+
+</header>
+
+<section id="slots"></section>
+
+<section class="editor">
+
+<div class="edithead"><span id="editing">EDITING SIGNAL 1</span><span id="length">0 / 50 SYMBOLS</span></div>
+
+<div id="morse"></div>
+
+<div class="keys">
+
+<button class="key dot" onclick="insert('.')">● DOT</button>
+
+<button class="key" onclick="insert('-')">— DASH</button>
+
+</div>
+
+<div class="tools">
+
+<button class="tool" onclick="move(-1)">◀</button>
+
+<button class="tool" onclick="move(1)">▶</button>
+
+<button class="tool" onclick="nextDigit()">NEXT 5</button>
+
+<button class="tool danger" onclick="backspace()">⌫</button>
+
+</div>
+
+<div id="info"></div>
+
+<div class="actions">
+
+<button id="copy" onclick="copyCode(active)">COPY 4</button>
+
+<button id="open" onclick="openMap(active)">COPY & OPEN MAP</button>
+
+</div>
+
+<button id="clear" onclick="clearCode()">CLEAR SELECTED SIGNAL</button>
+
+<div id="notice"></div>
+
+</section>
+
+<footer>MORSE GPS V2 · NASDARA</footer>
+
+</main>
+
+<script>
+
+const MORSE={
+
+"-----":"0",".----":"1","..---":"2",
+
+"...--":"3","....-":"4",".....":"5",
+
+"-....":"6","--...":"7","---..":"8","----.":"9"
+
+};
+
+const KEY="morse-gps-v2";
+
+let signals=["","","",""];
+
+let cursors=[0,0,0,0];
+
+let active=0;
+
+try{
+
+const saved=JSON.parse(localStorage.getItem(KEY)||"{}");
+
+if(Array.isArray(saved.signals)&&saved.signals.length===4)
+
+signals=saved.signals.map(s=>String(s).replace(/[^.-]/g,"").slice(0,50));
+
+if(Number.isInteger(saved.active)&&saved.active>=0&&saved.active<4)
+
+active=saved.active;
+
+}catch(e){}
+
+cursors=signals.map(s=>s.length);
+
+const el=id=>document.getElementById(id);
+
+function save(){
+
+try{localStorage.setItem(KEY,JSON.stringify({signals,active}));}catch(e){}
+
+}
+
+function decode(i){
+
+return (signals[i].match(/.{1,5}/g)||[]).map(g=>g.length<5?"_":MORSE[g]??"?").join("");
+
+}
+
+function format(d){
+
+if(!d)return "--- --- ----";
+
+return d.slice(0,3)+(d.length>3?" "+d.slice(3,6):"")+(d.length>6?" "+d.slice(6,10):"");
+
+}
+
+function valid(i){return /^[0-9]{10}$/.test(decode(i));}
+
+function select(i){active=i;save();render();}
+
+function insert(c){
+
+let s=signals[active],p=cursors[active];
+
+if(s.length>=50)return;
+
+signals[active]=s.slice(0,p)+c+s.slice(p);
+
+cursors[active]++;save();render();
+
+}
+
+function backspace(){
+
+let s=signals[active],p=cursors[active];
+
+if(!p)return;
+
+signals[active]=s.slice(0,p-1)+s.slice(p);
+
+cursors[active]--;save();render();
+
+}
+
+function move(n){
+
+cursors[active]=Math.max(0,Math.min(signals[active].length,cursors[active]+n));render();
+
+}
+
+function nextDigit(){
+
+let p=cursors[active];
+
+cursors[active]=Math.min(signals[active].length,p+5-p%5);render();
+
+}
+
+function position(i){
+
+if(!valid(i))return null;
+
+let d=decode(i);
+
+let x=Number(d.slice(0,3))*100+50;
+
+let y=16385-Number(d.slice(3,6))*100-50;
+
+return {code:d.slice(6,10),x,y,url:`https://www.izurvive.com/nasdara#location=${x};${y};5`};
+
+}
+
+function morseDisplay(){
+
+let s=signals[active],p=cursors[active],out="";
+
+for(let i=0;i<=s.length;i++){
+
+if(i===p)out+='<span class="cursor">│</span>';
+
+if(i<s.length){
+
+out+=s[i];
+
+if((i+1)%5===0&&i+1<s.length)out+=" ";
+
+}}
+
+return out;
+
+}
+
+function notice(t){el("notice").textContent=t;}
+
+async function copyText(t){
+
+try{await navigator.clipboard.writeText(t);return true;}
+
+catch(e){
+
+try{
+
+let a=document.createElement("textarea");
+
+a.value=t;a.style.position="fixed";a.style.opacity="0";
+
+document.body.appendChild(a);a.focus();a.select();
+
+let ok=document.execCommand("copy");a.remove();return ok;
+
+}catch(e){return false;}
+
+}}
+
+async function copyCode(i){
+
+let p=position(i);if(!p)return;
+
+notice(await copyText(p.code)?p.code+" copied":"Copy manually: "+p.code);
+
+}
+
+async function openMap(i){
+
+let p=position(i);if(!p)return;
+
+const copied=await copyText(p.code);
+
+if(!copied)notice("Clipboard blocked. Code: "+p.code);
+
+window.location.href=p.url;
+
+}
+
+function clearCode(){
+
+if(confirm("Clear Signal "+(active+1)+"?")){
+
+signals[active]="";cursors[active]=0;save();render();notice("");
+
+}}
+
+function render(){
+
+let slots=el("slots");slots.replaceChildren();
+
+for(let i=0;i<4;i++){
+
+let row=document.createElement("div");
+
+row.className="slot"+(i===active?" active":"");
+
+let n=document.createElement("span");
+
+n.className="num";n.textContent=String(i+1).padStart(2,"0");
+
+let code=document.createElement("button");
+
+code.className="code"+(valid(i)?" ready":"");
+
+code.textContent=format(decode(i));
+
+code.onclick=()=>select(i);
+
+row.append(n,code);
+
+if(valid(i)){
+
+let map=document.createElement("button");
+
+map.className="map";map.textContent="Map";
+
+map.onclick=()=>openMap(i);row.append(map);
+
+}else{
+
+let radio=document.createElement("button");
+
+radio.className="radio";radio.textContent=i===active?"●":"○";
+
+radio.onclick=()=>select(i);row.append(radio);
+
+}
+
+row.onclick=e=>{if(e.target===row||e.target===n)select(i);};
+
+slots.append(row);
+
+}
+
+el("count").textContent=signals.filter((_,i)=>valid(i)).length+" / 4 READY";
+
+el("editing").textContent="EDITING SIGNAL "+(active+1);
+
+el("length").textContent=signals[active].length+" / 50 SYMBOLS";
+
+el("morse").innerHTML=morseDisplay();
+
+let d=decode(active),p=position(active);
+
+el("info").textContent=p?
+
+"GRID "+d.slice(0,3)+" "+d.slice(3,6)+" · CLIPBOARD "+p.code:
+
+d.includes("?")?"Invalid Morse digit":
+
+d.includes("_")?"Incomplete Morse digit":d.length+" / 10 digits";
+
+el("copy").disabled=el("open").disabled=!p;
+
+}
+
+render();
+
+</script>
+
+</body>
+
+</html>

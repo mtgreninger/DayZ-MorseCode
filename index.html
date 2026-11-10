@@ -411,6 +411,140 @@ render();
 
 </script>
 
+
+<style>
+#installGuide {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #0b1019;
+  color: #f4f6fc;
+  overflow-y: auto;
+  padding: max(35px, env(safe-area-inset-top)) 22px 30px;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+.installWrap {
+  max-width: 430px;
+  margin: 0 auto;
+  text-align: center;
+}
+.installIcon {
+  width: 110px;
+  height: 110px;
+  border-radius: 25px;
+  object-fit: cover;
+  margin: 25px auto 12px;
+}
+.installWrap h2 {
+  font-size: 27px;
+  margin: 12px 0;
+}
+.installWrap p {
+  color: #a9b8d1;
+  line-height: 1.5;
+}
+.installSteps {
+  text-align: left;
+  background: #171e2d;
+  border: 1px solid #303b4d;
+  border-radius: 16px;
+  padding: 18px;
+  margin: 25px 0;
+}
+.installSteps div {
+  padding: 12px 0;
+  font-size: 15px;
+}
+.installBtn {
+  width: 100%;
+  border: 0;
+  background: #a6e8bf;
+  color: #153d27;
+  border-radius: 12px;
+  padding: 16px;
+  font-size: 16px;
+  font-weight: 800;
+}
+.installSkip {
+  display: block;
+  background: transparent;
+  border: 0;
+  color: #9ba9bf;
+  margin: 18px auto;
+  padding: 10px;
+  font-size: 14px;
+}
+</style>
+
+<div id="installGuide">
+  <div class="installWrap">
+    <img class="installIcon" src="./icon.PNG" alt="Nasdara icon">
+    <h2>Nasdara Morse GPS</h2>
+    <p>Add the translator to your Home Screen for quick access while playing DayZ.</p>
+
+    <div class="installSteps" id="installSteps">
+      <div>1. Tap Safari's Share button.</div>
+      <div>2. Select <b>Add to Home Screen</b>.</div>
+      <div>3. Tap <b>Add</b>.</div>
+    </div>
+
+    <button class="installBtn" id="installAction" onclick="installAction()">
+      Continue to Translator
+    </button>
+    <button class="installSkip" onclick="closeInstall()">
+      Skip installation
+    </button>
+  </div>
+</div>
+
+<script>
+let deferredInstallPrompt = null;
+
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+});
+
+function closeInstall() {
+  document.getElementById("installGuide").style.display = "none";
+}
+
+async function installAction() {
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+  } else {
+    closeInstall();
+  }
+}
+
+(function setupInstallGuide() {
+  const params = new URLSearchParams(location.search);
+  const wantsInstall = params.get("install") === "1";
+  const standalone =
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true;
+
+  if (!wantsInstall || standalone) return;
+
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  if (!isIOS) {
+    document.getElementById("installSteps").innerHTML =
+      "<div>On supported browsers, tap Install below.</div>" +
+      "<div>Otherwise, open your browser menu and choose Install app or Add to Home Screen.</div>";
+
+    document.getElementById("installAction").textContent =
+      "Install App";
+  }
+
+  document.getElementById("installGuide").style.display = "block";
+})();
+</script>
+
+ 
 </body>
 
 </html>
